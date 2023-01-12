@@ -12,5 +12,6 @@ Features include:
 
 ## Screenshot
 <p align="center">
-  <img src="img/screenshot.jpg" width="30%"/>
+  <img src="img/screenshot1.jpg" width="30%"/>
+  <img src="img/screenshot2.jpg" width="30%"/>
 </p>
