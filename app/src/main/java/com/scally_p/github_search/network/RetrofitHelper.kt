@@ -1,4 +1,4 @@
-package com.scally_p.github_search.network.retrofit
+package com.scally_p.github_search.network
 
 import com.google.gson.GsonBuilder
 import com.scally_p.github_search.BuildConfig

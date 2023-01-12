@@ -7,5 +7,5 @@ data class Repositories(
     @SerializedName("total_count")
     var totalCount: Int = 0,
 
-    var items: List<Repository>? = null
+    var items: MutableList<Repository>? = null
 )

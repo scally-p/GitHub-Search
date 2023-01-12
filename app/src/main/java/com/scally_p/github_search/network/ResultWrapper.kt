@@ -1,4 +1,4 @@
-package com.scally_p.github_search.network.retrofit
+package com.scally_p.github_search.network
 
 sealed class ResultWrapper<out T> {
     data class Success<out T>(val data: T) : ResultWrapper<T>()

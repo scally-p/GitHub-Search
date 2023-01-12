@@ -1,4 +1,4 @@
-package com.scally_p.github_search.network.retrofit
+package com.scally_p.github_search.network
 
 import java.io.IOException
 

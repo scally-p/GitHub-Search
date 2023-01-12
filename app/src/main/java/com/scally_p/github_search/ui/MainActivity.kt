@@ -3,23 +3,24 @@ package com.scally_p.github_search.ui
 import android.app.Activity
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 import android.view.KeyEvent
-import android.view.inputmethod.EditorInfo
+import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.core.view.isVisible
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.paging.LoadState
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.recyclerview.widget.SimpleItemAnimator
+import com.scally_p.github_search.R
 import com.scally_p.github_search.databinding.ActivityMainBinding
+import com.scally_p.github_search.model.Repository
+import com.scally_p.github_search.ui.adapter.LockableLinearLayoutManager
 import com.scally_p.github_search.ui.adapter.RepositoryAdapter
-import com.scally_p.github_search.ui.adapter.RepositoryLoadStateAdapter
-import com.scally_p.github_search.ui.data.UiAction
-import com.scally_p.github_search.ui.data.UiState
+import com.scally_p.github_search.util.Constants
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
@@ -31,6 +32,8 @@ class MainActivity : AppCompatActivity() {
 
     private val viewModel: MainActivityViewModel by viewModels()
 
+    private lateinit var repositoryAdapter: RepositoryAdapter
+
     private lateinit var inputMethodManager: InputMethodManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,10 +43,11 @@ class MainActivity : AppCompatActivity() {
 
         inputMethodManager = getSystemService(Activity.INPUT_METHOD_SERVICE) as InputMethodManager
 
-        bindState(
-            uiState = viewModel.state,
-            uiActions = viewModel.accept
-        )
+        lifecycleScope.launch {
+            prepareViews()
+
+            repeatOnLifecycle(Lifecycle.State.RESUMED) { displayData() }
+        }
     }
 
     override fun onResume() {
@@ -57,149 +61,89 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
     }
 
-    private fun bindState(
-        uiState: StateFlow<UiState>,
-        uiActions: (UiAction) -> Unit
-    ) {
-        println("Check --- here 1")
+    private fun prepareViews() {
+        repositoryAdapter = RepositoryAdapter()
 
-        val repositoryAdapter = RepositoryAdapter()
-        binding.recyclerView.layoutManager = LinearLayoutManager(this)
-        binding.recyclerView.adapter = repositoryAdapter.withLoadStateHeaderAndFooter(
-            header = RepositoryLoadStateAdapter { repositoryAdapter.retry() },
-            footer = RepositoryLoadStateAdapter { repositoryAdapter.retry() }
-        )
-        bindSearch(
-            uiState = uiState,
-            onQueryChanged = uiActions
-        )
-        bindList(
-            uiState = uiState,
-            onScrollChanged = uiActions,
-            repositoryAdapter = repositoryAdapter
-        )
-    }
-
-    private fun bindSearch(
-        uiState: StateFlow<UiState>,
-        onQueryChanged: (UiAction.Search) -> Unit
-    ) {
-        println("Check --- here 2")
-
-        binding.searchTxt.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_GO) {
-                updateRepositoriesFromInput(onQueryChanged)
-                hideKeyboard()
-                true
-            } else {
-                false
-            }
-        }
-
+        binding.searchTxt.setText(Constants.Api.DEFAULT_QUERY)
         binding.searchTxt.setOnKeyListener { _, keyCode, event ->
             if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_ENTER) {
-                updateRepositoriesFromInput(onQueryChanged)
                 hideKeyboard()
+                viewModel.reset()
+                repositoryAdapter.clear()
+                viewModel.searchRepositories(binding.searchTxt.text.toString().trim())
                 true
             } else {
                 false
             }
         }
 
-        lifecycleScope.launch {
-            println("Check --- here 3")
-
-            uiState
-                .map { it.query }
-                .distinctUntilChanged()
-                .collect(binding.searchTxt::setText)
+        binding.recyclerView.apply {
+            layoutManager = LockableLinearLayoutManager(this@MainActivity)
+            adapter = repositoryAdapter
         }
-    }
+        (binding.recyclerView.itemAnimator as SimpleItemAnimator).supportsChangeAnimations = false
+        (binding.recyclerView.layoutManager as LockableLinearLayoutManager).setRecyclerViewOverScrollListener(
+            object : LockableLinearLayoutManager.OverScrollListener {
+                override fun onBottomOverScroll() {
+                    Log.d(tag, "RecyclerViewOverScrollListener - onBottomOverScroll")
+                    if (!repositoryAdapter.footerLoading) {
+                        repositoryAdapter.addFooterLoader()
+                        binding.recyclerView.post {
+                            repositoryAdapter.notifyItemInserted(viewModel.repositories.lastIndex)
+                        }
 
-    private fun updateRepositoriesFromInput(onQueryChanged: (UiAction.Search) -> Unit) {
-        println("Check --- here 4")
-        binding.searchTxt.text.trim().let {
-            if (it.isNotEmpty()) {
-                println("Check --- here 5")
-                binding.recyclerView.scrollToPosition(0)
-                onQueryChanged(UiAction.Search(query = it.toString()))
-            }
-        }
-    }
-
-    private fun bindList(
-        uiState: StateFlow<UiState>,
-        onScrollChanged: (UiAction.Scroll) -> Unit,
-        repositoryAdapter: RepositoryAdapter,
-    ) {
-        println("Check --- here 6")
-
-        binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                if (dy != 0) onScrollChanged(UiAction.Scroll(currentQuery = uiState.value.query))
-            }
-        })
-        val notLoading = repositoryAdapter.loadStateFlow
-            .distinctUntilChangedBy { it.refresh }
-            .map { it.refresh is LoadState.NotLoading }
-
-        val hasNotScrolledForCurrentSearch = uiState
-            .map { it.hasNotScrolledForCurrentSearch }
-            .distinctUntilChanged()
-
-        val shouldScrollToTop = combine(
-            notLoading,
-            hasNotScrolledForCurrentSearch,
-            Boolean::and
-        )
-            .distinctUntilChanged()
-
-        val pagingData = uiState
-            .map { it.pagingData }
-            .distinctUntilChanged()
-
-        lifecycleScope.launch {
-            println("Check --- here 7")
-
-            combine(shouldScrollToTop, pagingData, ::Pair)
-                .distinctUntilChangedBy { it.second }
-                .collectLatest { (shouldScroll, pagingData) ->
-                    repositoryAdapter.submitData(pagingData)
-                    if (shouldScroll) binding.recyclerView.scrollToPosition(0)
+                        if (viewModel.currentCount < viewModel.totalCount) {
+                            viewModel.searchRepositories(binding.searchTxt.text.toString().trim())
+                        }
+                    }
                 }
+
+                override fun onTopOverScroll() {
+                    Log.d(tag, "RecyclerViewOverScrollListener - onTopOverScroll")
+                }
+            })
+    }
+
+    private fun displayData() {
+        viewModel.observeRepositoriesLiveData().observe(this) { repositories ->
+            repositoryAdapter.setList(repositories as ArrayList<Repository>)
+            viewModel.currentCount = repositoryAdapter.repositories.size
+            println("size size -- 3: ${viewModel.currentCount}")
+
+            binding.resultsCount.text = resources.getString(
+                R.string.results_count,
+                viewModel.currentCount.toString(),
+                viewModel.totalCount.toString()
+            )
+            binding.resultsCount.visibility = if (viewModel.repositories.isEmpty()) View.GONE else View.VISIBLE
         }
 
-        lifecycleScope.launch {
-            println("Check --- here 8")
-
-            repositoryAdapter.loadStateFlow.collect { loadState ->
-                val isListEmpty =
-                    loadState.refresh is LoadState.NotLoading && repositoryAdapter.itemCount == 0
-                binding.emptyList.isVisible = isListEmpty
-                binding.recyclerView.isVisible = !isListEmpty
-                binding.shimmerFrameLayout.isVisible = loadState.source.refresh is LoadState.Loading
-                binding.retry.isVisible = loadState.source.refresh is LoadState.Error
-
-                println("Check --- here 9")
-
-                val errorState = loadState.source.append as? LoadState.Error
-                    ?: loadState.source.prepend as? LoadState.Error
-                    ?: loadState.append as? LoadState.Error
-                    ?: loadState.prepend as? LoadState.Error
-                errorState?.let {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "\uD83D\uDE28 Wooops ${it.error}",
-                        Toast.LENGTH_SHORT
-                    ).show()
+        viewModel.observeLoading().observe(this) { loading ->
+            if (loading) {
+                if (repositoryAdapter.itemCount == 0) {
+                    binding.shimmerFrameLayout.startShimmer()
+                    binding.shimmerFrameLayout.isVisible = true
                 }
+                binding.progressBar.isVisible = true
+
+                binding.emptyList.isVisible = false
+            } else {
+                binding.shimmerFrameLayout.stopShimmer()
+                binding.shimmerFrameLayout.isVisible = false
+                binding.progressBar.isVisible = false
+
+                binding.emptyList.isVisible = viewModel.repositories.isEmpty()
             }
         }
+
+        viewModel.observeErrorMessage().observe(this) { message ->
+            Log.d(tag, message)
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        }
     }
+
 
     private fun hideKeyboard() {
-        println("Check --- here 10")
-
         inputMethodManager.hideSoftInputFromWindow(binding.searchTxt.windowToken, 0)
         binding.searchTxt.clearFocus()
     }

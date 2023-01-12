@@ -9,7 +9,7 @@ interface ApiService {
 
     @GET("search/repositories")
     suspend fun searchRepositories(
-        @Query("q") search: String,
+        @Query("q") query: String,
         @Query("page") page: Int,
         @Query("per_page") itemsPerPage: Int
     ): Response<Repositories>

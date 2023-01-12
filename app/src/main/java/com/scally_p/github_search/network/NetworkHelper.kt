@@ -1,4 +1,4 @@
-package com.scally_p.github_search.network.retrofit
+package com.scally_p.github_search.network
 
 import kotlinx.coroutines.*
 import retrofit2.HttpException

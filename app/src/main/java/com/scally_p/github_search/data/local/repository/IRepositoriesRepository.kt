@@ -1,9 +1,8 @@
 package com.scally_p.github_search.data.local.repository
 
-import androidx.paging.PagingData
-import com.scally_p.github_search.model.Repository
-import kotlinx.coroutines.flow.Flow
+import com.scally_p.github_search.model.Repositories
+
 
 interface IRepositoriesRepository {
-    fun getSearchResultStream(query: String): Flow<PagingData<Repository>>
+    suspend fun searchRepositories(query: String, page: Int): Result<Repositories>
 }

@@ -1,106 +1,108 @@
 package com.scally_p.github_search.ui
 
-import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.paging.PagingData
-import androidx.paging.cachedIn
-import androidx.paging.insertSeparators
-import androidx.paging.map
 import com.scally_p.github_search.data.local.repository.RepositoriesRepository
-import com.scally_p.github_search.ui.data.UiAction
-import com.scally_p.github_search.ui.data.UiModel
-import com.scally_p.github_search.ui.data.UiState
+import com.scally_p.github_search.model.Repository
 import com.scally_p.github_search.util.Constants
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class MainActivityViewModel @Inject constructor(
     private val repository: RepositoriesRepository,
-    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    val state: StateFlow<UiState>
+    private val tag: String = MainActivityViewModel::class.java.name
 
-    val accept: (UiAction) -> Unit
+    private val repositoriesEmitter = MutableLiveData<MutableList<Repository>>()
+    private val errorMessage = MutableLiveData<String>()
+    private val loading = MutableLiveData<Boolean>()
+    private var mTotalCount = 0
+    private var mCurrentCount = 0
+    private var mCurrentPage = 0
+
+    var totalCount: Int
+        get() {
+            return mTotalCount
+        }
+        set(value) {
+            mTotalCount = value
+        }
+
+    var currentCount: Int
+        get() {
+            return mCurrentCount
+        }
+        set(value) {
+            mCurrentCount = value
+        }
+
+     var currentPage: Int
+        get() {
+            return mCurrentPage
+        }
+        set(value) {
+            mCurrentPage = value
+        }
+
+    var repositories: MutableList<Repository>
+        get() {
+            return repositoriesEmitter.value ?: ArrayList()
+        }
+        set(repositories) {
+            repositoriesEmitter.value = repositories
+        }
 
     init {
-        val initialQuery: String =
-            savedStateHandle[Constants.Api.LAST_SEARCH_QUERY] ?: Constants.Api.DEFAULT_QUERY
-        val lastQueryScrolled: String =
-            savedStateHandle[Constants.Api.LAST_QUERY_SCROLLED] ?: Constants.Api.DEFAULT_QUERY
-        val actionStateFlow = MutableSharedFlow<UiAction>()
-        val searches = actionStateFlow
-            .filterIsInstance<UiAction.Search>()
-            .distinctUntilChanged()
-            .onStart { emit(UiAction.Search(query = initialQuery)) }
-        val queriesScrolled = actionStateFlow
-            .filterIsInstance<UiAction.Scroll>()
-            .distinctUntilChanged()
-            .shareIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5000),
-                replay = 1
-            )
-            .onStart { emit(UiAction.Scroll(currentQuery = lastQueryScrolled)) }
+        searchRepositories(Constants.Api.DEFAULT_QUERY)
+    }
 
-        state = searches
-            .flatMapLatest { search ->
-                combine(
-                    queriesScrolled,
-                    searchRepositories(queryString = search.query),
-                    ::Pair
+    fun reset() {
+        mTotalCount = 0
+        mCurrentCount = 0
+        mCurrentPage = 0
+        println("size size -- 1: ${repositoriesEmitter.value?.size}")
+        repositoriesEmitter.value = emptyList<Repository>().toMutableList()
+        println("size size -- 2: ${repositoriesEmitter.value?.size}")
+    }
+
+    fun searchRepositories(query: String?) {
+        if (query.isNullOrEmpty()) return
+        loading.value = true
+
+        viewModelScope.launch {
+            val result = repository.searchRepositories(query, currentPage + 1)
+            if (result.isSuccess) {
+                totalCount = result.getOrNull()?.totalCount ?: 0
+                currentPage += 1
+                repositories = result.getOrNull()?.items ?: ArrayList()
+                loading.value = false
+            } else {
+                result.exceptionOrNull()?.printStackTrace()
+                onError(
+                    "Message: ${result.exceptionOrNull()?.message}\nLocalizedMessage: ${result.exceptionOrNull()?.localizedMessage}"
                 )
-                    .distinctUntilChangedBy { it.second }
-                    .map { (scroll, pagingData) ->
-                        UiState(
-                            query = search.query,
-                            pagingData = pagingData,
-                            lastQueryScrolled = scroll.currentQuery,
-                            // If the search query matches the scroll query, the user has scrolled
-                            hasNotScrolledForCurrentSearch = search.query != scroll.currentQuery
-                        )
-                    }
             }
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5000),
-                initialValue = UiState()
-            )
-
-        accept = { action ->
-            viewModelScope.launch { actionStateFlow.emit(action) }
         }
     }
 
-    private fun searchRepositories(queryString: String): Flow<PagingData<UiModel>> {
-        println("Check --- here 11")
-        return repository.getSearchResultStream(queryString)
-            .map { pagingData -> pagingData.map { UiModel.RepositoryItem(it) } }
-            .map {
-                it.insertSeparators { before, after ->
-                    if (after == null) {
-                        return@insertSeparators null
-                    }
-
-                    if (before == null) {
-                        return@insertSeparators null
-                    }
-
-                    UiModel.SeparatorItem("")
-                }
-            }
-            .cachedIn(viewModelScope)
+    fun observeRepositoriesLiveData(): MutableLiveData<MutableList<Repository>> {
+        return repositoriesEmitter
     }
 
-    override fun onCleared() {
-        savedStateHandle[Constants.Api.LAST_SEARCH_QUERY] = state.value.query
-        savedStateHandle[Constants.Api.LAST_QUERY_SCROLLED] = state.value.lastQueryScrolled
-        super.onCleared()
+    fun observeErrorMessage(): MutableLiveData<String> {
+        return errorMessage
+    }
+
+    fun observeLoading(): MutableLiveData<Boolean> {
+        return loading
+    }
+
+    private fun onError(message: String) {
+        errorMessage.postValue(message)
+        loading.postValue(false)
     }
 }

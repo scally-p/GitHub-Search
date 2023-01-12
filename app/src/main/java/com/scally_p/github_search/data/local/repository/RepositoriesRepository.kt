@@ -1,25 +1,33 @@
 package com.scally_p.github_search.data.local.repository
 
-import androidx.paging.Pager
-import androidx.paging.PagingConfig
-import androidx.paging.PagingData
-import com.scally_p.github_search.model.Repository
-import com.scally_p.github_search.network.paging.RepositoriesPagingSource
+import com.scally_p.github_search.extension.exceptionOrNull
+import com.scally_p.github_search.model.Repositories
+import com.scally_p.github_search.network.NetworkHelper
+import com.scally_p.github_search.network.RetrofitHelper
 import com.scally_p.github_search.util.Constants
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class RepositoriesRepository : IRepositoriesRepository {
 
     private val tag: String = RepositoriesRepository::class.java.name
 
-    override fun getSearchResultStream(query: String): Flow<PagingData<Repository>> {
-        println("Check --- here 12")
-        return Pager(
-            config = PagingConfig(
-                pageSize = Constants.Paging.PAGE_SIZE,
-                enablePlaceholders = false
-            ),
-            pagingSourceFactory = { RepositoriesPagingSource(query) }
-        ).flow
+    override suspend fun searchRepositories(query: String, page: Int): Result<Repositories> {
+        val apiResponse = NetworkHelper.apiRequest {
+            RetrofitHelper.retrofitApiInstance.searchRepositories(
+                query,
+                page,
+                Constants.Paging.PAGE_SIZE
+            )
+        }
+
+        return withContext(Dispatchers.IO) {
+            val body = apiResponse.getOrNull()?.body()
+            if (apiResponse.isSuccess && body != null) {
+                Result.success(body)
+            } else {
+                Result.failure(apiResponse.exceptionOrNull() ?: Exception("Request Failed"))
+            }
+        }
     }
 }

@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">GitHub-Search</string>
     <string name="search_hint">Search Repositories</string>
-    <string name="retry">Retry</string>
+    <string name="results_count">%1$s of %2$s repositories</string>
     <string name="lorem_ipsum">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean maximus ornare semper. In mauris sapien, faucibus quis orci et, varius consectetur eros. Morbi ac vulputate tortor. Sed quis malesuada lectus, eget ullamcorper justo. Morbi quis condimentum arcu, sed scelerisque diam. Interdum et malesuada fames ac ante ipsum primis in faucibus. In ipsum ligula, blandit quis imperdiet sed, ullamcorper nec nisl. Phasellus et iaculis lorem. Morbi lobortis, turpis a rutrum feugiat, mauris dui tempor mauris, nec pellentesque lorem magna vel lorem. Praesent nec laoreet massa.</string>
 </resources>

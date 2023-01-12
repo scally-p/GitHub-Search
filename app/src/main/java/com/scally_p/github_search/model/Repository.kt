@@ -21,5 +21,7 @@ data class Repository(
 
     var description: String? = null,
 
-    var url: String? = null
+    var url: String? = null,
+
+    var footer: Boolean = false
 )

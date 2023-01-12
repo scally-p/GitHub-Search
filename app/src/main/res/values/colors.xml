@@ -71,6 +71,7 @@
 
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="blue">#FF309DFF</color>
     <color name="aaaaaa">#aaaaaa</color>
     <color name="bbbbbb">#bbbbbb</color>
     <color name="cccccc">#cccccc</color>
