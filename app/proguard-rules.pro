@@ -19,3 +19,21 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+-keepattributes InnerClasses
+ -keep class com.scally_p.github_search.model.Owner**
+ -keepclassmembers class com.scally_p.github_search.model.Owner** {
+    *;
+ }
+
+-keepattributes InnerClasses
+ -keep class com.scally_p.github_search.model.Repositories**
+ -keepclassmembers class com.scally_p.github_search.model.Repositories** {
+    *;
+ }
+
+-keepattributes InnerClasses
+ -keep class com.scally_p.github_search.model.Repository**
+ -keepclassmembers class com.scally_p.github_search.model.Repository** {
+    *;
+ }

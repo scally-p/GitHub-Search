@@ -4,8 +4,10 @@ import com.google.gson.annotations.SerializedName
 
 data class Owner(
 
+    @SerializedName("id")
     var id: Int? = null,
 
+    @SerializedName("login")
     var login: String? = null,
 
     @SerializedName("node_id")
@@ -17,6 +19,7 @@ data class Owner(
     @SerializedName("gravatar_id")
     var gravatarId: String? = null,
 
+    @SerializedName("url")
     var url: String? = null,
 
     @SerializedName("html_url")
