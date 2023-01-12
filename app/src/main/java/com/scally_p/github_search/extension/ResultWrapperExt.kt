@@ -1,7 +1,7 @@
 package com.scally_p.github_search.extension
 
-import com.scally_p.github_search.data.network.NoInternetException
-import com.scally_p.github_search.data.network.ResultWrapper
+import com.scally_p.github_search.network.retrofit.NoInternetException
+import com.scally_p.github_search.network.retrofit.ResultWrapper
 
 fun ResultWrapper.Failure.exception(): Exception {
     return Exception("$code:${this.exception?.message}")

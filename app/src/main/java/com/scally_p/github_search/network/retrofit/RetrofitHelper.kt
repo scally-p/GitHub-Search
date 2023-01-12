@@ -1,8 +1,8 @@
-package com.scally_p.github_search.data.network
+package com.scally_p.github_search.network.retrofit
 
 import com.google.gson.GsonBuilder
 import com.scally_p.github_search.BuildConfig
-import com.scally_p.github_search.data.api.Api
+import com.scally_p.github_search.data.api.ApiService
 import com.scally_p.github_search.util.Constants
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -39,7 +39,7 @@ object RetrofitHelper  {
             .build()
     }
 
-    val retrofitApiInstance: Api by lazy {
-        retrofit.create(Api::class.java)
+    val retrofitApiInstance: ApiService by lazy {
+        retrofit.create(ApiService::class.java)
     }
 }
